@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ทะเบียนรถ - ระบบจัดการน้ำมัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body data-theme="light">
+    <button class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🛡️</div>
+                <div>
+                    <div class="sidebar-title">ระบบจัดการน้ำมัน</div>
+                    <div class="sidebar-subtitle">กองพันทหารราบ</div>
+                </div>
+            </div>
+            <ul class="nav-menu"></ul>
+            <div class="sidebar-user">
+                <div class="user-info"></div>
+                <a href="#" class="nav-link" id="logoutBtn"><i
+                        class="fas fa-sign-out-alt"></i><span>ออกจากระบบ</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-car"></i> ทะเบียนรถหน่วย</h1>
+                    <p class="page-subtitle">จัดการรายการรถยนต์ในหน่วย</p>
+                </div>
+                <button class="btn btn-primary" onclick="showModal()"><i class="fas fa-plus"></i> เพิ่มรถ</button>
+            </div>
+
+            <!-- Summary -->
+            <div class="stat-cards mb-3">
+                <div class="stat-card">
+                    <div class="stat-icon primary"><i class="fas fa-car"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">รถทั้งหมด</div>
+                        <div class="stat-value" id="totalVehicles">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon diesel"><i class="fas fa-oil-can"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">รถดีเซล</div>
+                        <div class="stat-value" id="dieselVehicles">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon benzin95"><i class="fas fa-gas-pump"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">รถเบนซิน</div>
+                        <div class="stat-value" id="benzinVehicles">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vehicles Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-list"></i> รายการรถ</h3>
+                </div>
+                <div class="card-body" style="padding:0">
+                    <div class="table-container" id="vehiclesTable"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="vehicleModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">เพิ่มรถใหม่</h3>
+                <button class="modal-close" onclick="hideModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="vehicleForm">
+                    <input type="hidden" id="vehicleId">
+                    <div class="form-group">
+                        <label class="form-label">ทะเบียนรถ <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="plate" required placeholder="เช่น ทบ 1234">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">ประเภทรถ <span class="required">*</span></label>
+                            <select class="form-control form-select" id="vehicleType" required>
+                                <option value="รถจิ๊ป">รถจิ๊ป</option>
+                                <option value="รถเก๋ง">รถเก๋ง</option>
+                                <option value="รถบรรทุก">รถบรรทุก</option>
+                                <option value="รถตู้">รถตู้</option>
+                                <option value="รถกระบะ">รถกระบะ</option>
+                                <option value="รถจักรยานยนต์">รถจักรยานยนต์</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">ยี่ห้อ</label>
+                            <input type="text" class="form-control" id="brand" placeholder="เช่น Toyota">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">ประเภทน้ำมัน <span class="required">*</span></label>
+                            <select class="form-control form-select" id="fuelType" required>
+                                <option value="diesel">ดีเซล</option>
+                                <option value="benzin95">เบนซิน 95</option>
+                                <option value="benzin91">เบนซิน 91</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">หน่วยงาน <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="department" required
+                                placeholder="เช่น กองบังคับการ">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideModal()">ยกเลิก</button>
+                <button class="btn btn-primary" onclick="saveVehicle()"><i class="fas fa-save"></i> บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../utils.js"></script>
+    <script src="../data.js"></script>
+    <script src="../auth.js"></script>
+    <script src="../google-sheets.js"></script>
+    <script src="../vehicles.js"></script>
+    <script src="../app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!Auth.isAdmin() && !Auth.isOfficer()) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            loadVehicles();
+        });
+
+        function loadVehicles() {
+            const vehicles = VehicleRegistry.getAll();
+
+            // Summary
+            document.getElementById('totalVehicles').textContent = vehicles.length;
+            document.getElementById('dieselVehicles').textContent = vehicles.filter(v => v.fuelType === 'diesel').length;
+            document.getElementById('benzinVehicles').textContent = vehicles.filter(v => v.fuelType !== 'diesel').length;
+
+            // Table
+            if (vehicles.length === 0) {
+                document.getElementById('vehiclesTable').innerHTML = '<div class="empty-state"><i class="fas fa-car"></i><h3>ไม่มีรถ</h3><p>คลิก "เพิ่มรถ" เพื่อเพิ่มรถใหม่</p></div>';
+                return;
+            }
+
+            document.getElementById('vehiclesTable').innerHTML = `
+                <table class="table">
+                    <thead><tr><th>ทะเบียน</th><th>ประเภท</th><th>ยี่ห้อ</th><th>น้ำมัน</th><th>หน่วยงาน</th><th>สถานะ</th><th></th></tr></thead>
+                    <tbody>
+                        ${vehicles.map(v => `
+                            <tr>
+                                <td><strong>${v.plate}</strong></td>
+                                <td>${v.type}</td>
+                                <td>${v.brand || '-'}</td>
+                                <td><span class="badge badge-${v.fuelType}">${Utils.getFuelTypeName(v.fuelType)}</span></td>
+                                <td>${v.department}</td>
+                                <td><span class="badge ${v.active ? 'badge-approved' : 'badge-rejected'}">${v.active ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
+                                <td class="table-actions">
+                                    <button class="btn btn-sm btn-secondary" onclick="editVehicle('${v.id}')"><i class="fas fa-edit"></i></button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteVehicle('${v.id}')"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function showModal(vehicle = null) {
+            document.getElementById('modalTitle').textContent = vehicle ? 'แก้ไขรถ' : 'เพิ่มรถใหม่';
+            document.getElementById('vehicleId').value = vehicle ? vehicle.id : '';
+            document.getElementById('plate').value = vehicle ? vehicle.plate : '';
+            document.getElementById('vehicleType').value = vehicle ? vehicle.type : 'รถจิ๊ป';
+            document.getElementById('brand').value = vehicle ? vehicle.brand : '';
+            document.getElementById('fuelType').value = vehicle ? vehicle.fuelType : 'diesel';
+            document.getElementById('department').value = vehicle ? vehicle.department : '';
+            document.getElementById('vehicleModal').classList.add('active');
+        }
+
+        function hideModal() {
+            document.getElementById('vehicleModal').classList.remove('active');
+        }
+
+        function editVehicle(id) {
+            const vehicle = VehicleRegistry.getById(id);
+            if (vehicle) showModal(vehicle);
+        }
+
+        async function deleteVehicle(id) {
+            if (!await Utils.confirm('ต้องการลบรถนี้?')) return;
+            VehicleRegistry.delete(id);
+            Utils.showToast('ลบรถสำเร็จ', 'success');
+            loadVehicles();
+        }
+
+        function saveVehicle() {
+            const id = document.getElementById('vehicleId').value;
+            const vehicle = {
+                plate: document.getElementById('plate').value.trim(),
+                type: document.getElementById('vehicleType').value,
+                brand: document.getElementById('brand').value.trim(),
+                fuelType: document.getElementById('fuelType').value,
+                department: document.getElementById('department').value.trim()
+            };
+
+            if (!vehicle.plate || !vehicle.department) {
+                Utils.showToast('กรุณากรอกข้อมูลให้ครบ', 'warning');
+                return;
+            }
+
+            if (id) {
+                VehicleRegistry.update(id, vehicle);
+                Utils.showToast('แก้ไขรถสำเร็จ', 'success');
+            } else {
+                VehicleRegistry.add(vehicle);
+                Utils.showToast('เพิ่มรถสำเร็จ', 'success');
+            }
+
+            hideModal();
+            loadVehicles();
+        }
+    </script>
+</body>
+
+</html>

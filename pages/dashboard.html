@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - ระบบจัดการน้ำมัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body data-theme="light">
+    <button class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🛡️</div>
+                <div>
+                    <div class="sidebar-title">ระบบจัดการน้ำมัน</div>
+                    <div class="sidebar-subtitle">กองพันทหารราบ</div>
+                </div>
+            </div>
+            <ul class="nav-menu"></ul>
+            <div class="sidebar-user">
+                <div class="user-info"></div>
+                <a href="#" class="nav-link" id="logoutBtn"><i
+                        class="fas fa-sign-out-alt"></i><span>ออกจากระบบ</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+                    <p class="page-subtitle">ภาพรวมระบบจัดการน้ำมันเชื้อเพลิง</p>
+                </div>
+                <div class="btn-group">
+                    <div class="sync-status" id="syncStatus">
+                        <span class="sync-dot"></span>
+                        <span id="syncText">-</span>
+                    </div>
+                    <button class="btn btn-secondary" onclick="syncData()" id="syncBtn"><i class="fas fa-sync-alt"></i>
+                        Sync</button>
+                    <button class="btn btn-warning" onclick="location.href='request.html'"><i
+                            class="fas fa-gas-pump"></i> เบิกน้ำมัน</button>
+                </div>
+            </div>
+
+            <!-- Fuel Inventory Cards -->
+            <div class="stat-cards" id="inventoryCards"></div>
+
+            <!-- Quick Stats -->
+            <div class="stat-cards" id="quickStats"></div>
+
+            <!-- Charts Section -->
+            <div class="stat-cards mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-chart-bar"></i> การใช้น้ำมันรายเดือน</h3>
+                    </div>
+                    <div class="card-body"><canvas id="monthlyChart" height="200"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-chart-pie"></i> สัดส่วนการใช้น้ำมัน</h3>
+                    </div>
+                    <div class="card-body"><canvas id="fuelTypeChart" height="200"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Recent Requests -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-clipboard-list"></i> คำขอล่าสุด</h3>
+                    <a href="reports.html" class="btn btn-sm btn-secondary">ดูทั้งหมด</a>
+                </div>
+                <div class="card-body" style="padding:0">
+                    <div class="table-container" id="recentRequests"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../utils.js"></script>
+    <script src="../data.js"></script>
+    <script src="../auth.js"></script>
+    <script src="../google-sheets.js"></script>
+    <script src="../line-notify.js"></script>
+    <script src="../vehicles.js"></script>
+    <script src="../auto-sync.js"></script>
+    <script src="../app.js"></script>
+    <script>
+        let monthlyChart, fuelTypeChart;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadDashboard();
+            updateSyncStatus();
+            initCharts();
+        });
+
+        function loadDashboard() {
+            const stats = DataManager.getSummaryStats();
+            const inventory = stats.inventory;
+            const user = Auth.getCurrentUser();
+
+            // Check low fuel alerts
+            checkLowFuelAlerts(inventory);
+
+            // Inventory cards
+            document.getElementById('inventoryCards').innerHTML = `
+                <div class="stat-card ${inventory.diesel.current / inventory.diesel.capacity <= 0.2 ? 'low-fuel' : ''}">
+                    <div class="stat-icon diesel"><i class="fas fa-oil-can"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">ดีเซล</div>
+                        <div class="stat-value">${Utils.formatNumber(inventory.diesel.current)}<span class="stat-unit">ลิตร</span></div>
+                        <div class="progress mt-1"><div class="progress-bar diesel" style="width:${(inventory.diesel.current / inventory.diesel.capacity) * 100}%"></div></div>
+                    </div>
+                </div>
+                <div class="stat-card ${inventory.benzin95.current / inventory.benzin95.capacity <= 0.2 ? 'low-fuel' : ''}">
+                    <div class="stat-icon benzin95"><i class="fas fa-gas-pump"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">เบนซิน 95</div>
+                        <div class="stat-value">${Utils.formatNumber(inventory.benzin95.current)}<span class="stat-unit">ลิตร</span></div>
+                        <div class="progress mt-1"><div class="progress-bar benzin95" style="width:${(inventory.benzin95.current / inventory.benzin95.capacity) * 100}%"></div></div>
+                    </div>
+                </div>
+                <div class="stat-card ${inventory.benzin91.current / inventory.benzin91.capacity <= 0.2 ? 'low-fuel' : ''}">
+                    <div class="stat-icon benzin91"><i class="fas fa-gas-pump"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">เบนซิน 91</div>
+                        <div class="stat-value">${Utils.formatNumber(inventory.benzin91.current)}<span class="stat-unit">ลิตร</span></div>
+                        <div class="progress mt-1"><div class="progress-bar benzin91" style="width:${(inventory.benzin91.current / inventory.benzin91.capacity) * 100}%"></div></div>
+                    </div>
+                </div>
+            `;
+
+            // Quick stats
+            document.getElementById('quickStats').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-icon warning"><i class="fas fa-hourglass-half"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">รออนุมัติ</div>
+                        <div class="stat-value">${stats.pendingRequests}</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success"><i class="fas fa-check-double"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">จ่ายวันนี้</div>
+                        <div class="stat-value">${stats.completedToday}</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon primary"><i class="fas fa-file-invoice"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">รายการทั้งหมด</div>
+                        <div class="stat-value">${stats.totalRequests}</div>
+                    </div>
+                </div>
+            `;
+
+            // Recent requests
+            let requests = DataManager.getRequests();
+            if (user.role === 'requester') {
+                requests = requests.filter(r => r.requesterId === user.id);
+            }
+            requests = requests.slice(0, 5);
+
+            if (requests.length === 0) {
+                document.getElementById('recentRequests').innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>ไม่มีคำขอ</h3><p>ยังไม่มีคำขอเบิกน้ำมัน</p></div>';
+            } else {
+                document.getElementById('recentRequests').innerHTML = `
+                    <table class="table">
+                        <thead><tr><th>รหัส</th><th>ผู้เบิก</th><th>ประเภท</th><th>จำนวน</th><th>ทะเบียน</th><th>สถานะ</th><th>วันที่</th></tr></thead>
+                        <tbody>
+                            ${requests.map(r => `
+                                <tr>
+                                    <td><strong>${r.id}</strong></td>
+                                    <td>${r.requesterName}</td>
+                                    <td><span class="badge badge-${r.fuelType}">${Utils.getFuelTypeName(r.fuelType)}</span></td>
+                                    <td>${Utils.formatNumber(r.liters)} ลิตร</td>
+                                    <td>${r.vehiclePlate}</td>
+                                    <td><span class="badge badge-${r.status}">${Utils.getStatusName(r.status)}</span></td>
+                                    <td>${Utils.formatDate(r.requestDate)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+
+        function checkLowFuelAlerts(inventory) {
+            ['diesel', 'benzin95', 'benzin91'].forEach(type => {
+                const fuel = inventory[type];
+                if (fuel.current / fuel.capacity <= 0.2) {
+                    const percent = Math.round((fuel.current / fuel.capacity) * 100);
+                    Utils.showToast(`⚠️ ${Utils.getFuelTypeName(type)} ใกล้หมด (${percent}%)`, 'warning', 5000);
+                }
+            });
+        }
+
+        function initCharts() {
+            const transactions = DataManager.getTransactions();
+
+            // Monthly usage chart
+            const monthlyData = getMonthlyData(transactions);
+            const ctx1 = document.getElementById('monthlyChart').getContext('2d');
+            monthlyChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: monthlyData.labels,
+                    datasets: [{
+                        label: 'ดีเซล',
+                        data: monthlyData.diesel,
+                        backgroundColor: 'rgba(251, 191, 36, 0.8)',
+                        borderColor: '#fbbf24',
+                        borderWidth: 1
+                    }, {
+                        label: 'เบนซิน 95',
+                        data: monthlyData.benzin95,
+                        backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                        borderColor: '#22c55e',
+                        borderWidth: 1
+                    }, {
+                        label: 'เบนซิน 91',
+                        data: monthlyData.benzin91,
+                        backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                        borderColor: '#ef4444',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            // Fuel type pie chart
+            const fuelTypeData = getFuelTypeData(transactions);
+            const ctx2 = document.getElementById('fuelTypeChart').getContext('2d');
+            fuelTypeChart = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['ดีเซล', 'เบนซิน 95', 'เบนซิน 91'],
+                    datasets: [{
+                        data: [fuelTypeData.diesel, fuelTypeData.benzin95, fuelTypeData.benzin91],
+                        backgroundColor: ['#fbbf24', '#22c55e', '#ef4444'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        function getMonthlyData(transactions) {
+            const months = [];
+            const diesel = [];
+            const benzin95 = [];
+            const benzin91 = [];
+
+            const now = new Date();
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthName = d.toLocaleDateString('th-TH', { month: 'short' });
+                months.push(monthName);
+
+                const monthTrans = transactions.filter(t => {
+                    if (t.type !== 'dispense') return false;
+                    const td = new Date(t.transactionDate);
+                    return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
+                });
+
+                diesel.push(monthTrans.filter(t => t.fuelType === 'diesel').reduce((a, t) => a + (t.liters || 0), 0));
+                benzin95.push(monthTrans.filter(t => t.fuelType === 'benzin95').reduce((a, t) => a + (t.liters || 0), 0));
+                benzin91.push(monthTrans.filter(t => t.fuelType === 'benzin91').reduce((a, t) => a + (t.liters || 0), 0));
+            }
+
+            return { labels: months, diesel, benzin95, benzin91 };
+        }
+
+        function getFuelTypeData(transactions) {
+            const dispense = transactions.filter(t => t.type === 'dispense');
+            return {
+                diesel: dispense.filter(t => t.fuelType === 'diesel').reduce((a, t) => a + (t.liters || 0), 0),
+                benzin95: dispense.filter(t => t.fuelType === 'benzin95').reduce((a, t) => a + (t.liters || 0), 0),
+                benzin91: dispense.filter(t => t.fuelType === 'benzin91').reduce((a, t) => a + (t.liters || 0), 0)
+            };
+        }
+
+        function updateSyncStatus() {
+            const status = document.getElementById('syncStatus');
+            const text = document.getElementById('syncText');
+
+            if (GoogleSheets.isConfigured()) {
+                status.className = 'sync-status synced';
+                text.textContent = 'Sync: ' + GoogleSheets.getLastSyncTime();
+            } else {
+                status.className = 'sync-status';
+                text.textContent = 'ยังไม่ได้ตั้งค่า Google Sheets';
+            }
+        }
+
+        async function syncData() {
+            const btn = document.getElementById('syncBtn');
+            const status = document.getElementById('syncStatus');
+
+            if (!GoogleSheets.isConfigured()) {
+                Utils.showToast('กรุณาตั้งค่า Google Sheets URL ในหน้าตั้งค่า', 'warning');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลัง Sync...';
+            status.className = 'sync-status syncing';
+
+            const result = await GoogleSheets.syncToSheets();
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync';
+
+            if (result.success) {
+                Utils.showToast('Sync ข้อมูลไปยัง Google Sheets สำเร็จ', 'success');
+                updateSyncStatus();
+            } else {
+                status.className = 'sync-status error';
+                Utils.showToast(result.message, 'danger');
+            }
+        }
+    </script>
+    <style>
+        .stat-card.low-fuel {
+            border: 2px solid var(--danger);
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+
+            0%,
+            100% {
+                border-color: var(--danger);
+            }
+
+            50% {
+                border-color: transparent;
+            }
+        }
+    </style>
+</body>
+
+</html>

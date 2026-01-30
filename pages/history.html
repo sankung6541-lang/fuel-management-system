@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ประวัติผู้เบิก - ระบบจัดการน้ำมัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body data-theme="light">
+    <button class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🛡️</div>
+                <div>
+                    <div class="sidebar-title">ระบบจัดการน้ำมัน</div>
+                    <div class="sidebar-subtitle">กองพันทหารราบ</div>
+                </div>
+            </div>
+            <ul class="nav-menu"></ul>
+            <div class="sidebar-user">
+                <div class="user-info"></div>
+                <a href="#" class="nav-link" id="logoutBtn"><i
+                        class="fas fa-sign-out-alt"></i><span>ออกจากระบบ</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-user-clock"></i> ประวัติผู้เบิก</h1>
+                    <p class="page-subtitle">ดูประวัติการเบิกน้ำมันรายบุคคล</p>
+                </div>
+            </div>
+
+            <!-- User Selection -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2">
+                            <label class="form-label">เลือกผู้เบิก</label>
+                            <select class="form-control form-select" id="userSelect" onchange="loadUserHistory()">
+                                <option value="">-- เลือกผู้เบิก --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">ช่วงเวลา</label>
+                            <select class="form-control form-select" id="periodSelect" onchange="loadUserHistory()">
+                                <option value="30">30 วัน</option>
+                                <option value="90">90 วัน</option>
+                                <option value="180">180 วัน</option>
+                                <option value="365">1 ปี</option>
+                                <option value="0">ทั้งหมด</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Stats -->
+            <div class="stat-cards mb-3" id="userStats" style="display:none">
+                <div class="stat-card">
+                    <div class="stat-icon primary"><i class="fas fa-file-invoice"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">คำขอทั้งหมด</div>
+                        <div class="stat-value" id="statTotal">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">อนุมัติแล้ว</div>
+                        <div class="stat-value" id="statApproved">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon diesel"><i class="fas fa-oil-can"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">รวมน้ำมัน</div>
+                        <div class="stat-value" id="statLiters">0<span class="stat-unit">ลิตร</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Chart -->
+            <div class="card mb-3" id="chartCard" style="display:none">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-chart-line"></i> กราฟการใช้น้ำมัน</h3>
+                </div>
+                <div class="card-body"><canvas id="userChart" height="200"></canvas></div>
+            </div>
+
+            <!-- User Requests -->
+            <div class="card" id="requestsCard" style="display:none">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-list"></i> รายการเบิก</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="exportUserHistory()"><i
+                            class="fas fa-file-excel"></i> Export</button>
+                </div>
+                <div class="card-body" style="padding:0" id="requestsTable"></div>
+            </div>
+
+            <!-- Empty State -->
+            <div class="card" id="emptyState">
+                <div class="card-body">
+                    <div class="empty-state">
+                        <i class="fas fa-user-circle"></i>
+                        <h3>เลือกผู้เบิก</h3>
+                        <p>กรุณาเลือกผู้เบิกเพื่อดูประวัติการเบิกน้ำมัน</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../utils.js"></script>
+    <script src="../data.js"></script>
+    <script src="../auth.js"></script>
+    <script src="../google-sheets.js"></script>
+    <script src="../app.js"></script>
+    <script>
+        let userChart;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!Auth.isAdmin() && !Auth.isOfficer()) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            loadUsers();
+        });
+
+        function loadUsers() {
+            const users = DataManager.getUsers().filter(u => u.role === 'requester' || u.role === 'officer');
+            const select = document.getElementById('userSelect');
+
+            users.forEach(u => {
+                select.innerHTML += `<option value="${u.id}">${u.name} (${Utils.getRoleName(u.role)})</option>`;
+            });
+        }
+
+        function loadUserHistory() {
+            const userId = document.getElementById('userSelect').value;
+            const period = parseInt(document.getElementById('periodSelect').value);
+
+            if (!userId) {
+                document.getElementById('userStats').style.display = 'none';
+                document.getElementById('chartCard').style.display = 'none';
+                document.getElementById('requestsCard').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('userStats').style.display = 'flex';
+            document.getElementById('chartCard').style.display = 'block';
+            document.getElementById('requestsCard').style.display = 'block';
+
+            let requests = DataManager.getRequestsByUser(userId);
+
+            // Filter by period
+            if (period > 0) {
+                const cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - period);
+                requests = requests.filter(r => new Date(r.requestDate) >= cutoff);
+            }
+
+            // Stats
+            const completed = requests.filter(r => r.status === 'completed');
+            const totalLiters = completed.reduce((a, r) => a + (r.actualLiters || r.liters || 0), 0);
+
+            document.getElementById('statTotal').textContent = requests.length;
+            document.getElementById('statApproved').textContent = completed.length;
+            document.getElementById('statLiters').innerHTML = Utils.formatNumber(totalLiters) + '<span class="stat-unit">ลิตร</span>';
+
+            // Chart
+            renderChart(completed);
+
+            // Table
+            renderTable(requests);
+        }
+
+        function renderChart(requests) {
+            const ctx = document.getElementById('userChart').getContext('2d');
+
+            if (userChart) userChart.destroy();
+
+            // Group by month
+            const monthlyData = {};
+            requests.forEach(r => {
+                const d = new Date(r.requestDate);
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                if (!monthlyData[key]) monthlyData[key] = { diesel: 0, benzin95: 0, benzin91: 0 };
+                monthlyData[key][r.fuelType] += r.actualLiters || r.liters || 0;
+            });
+
+            const labels = Object.keys(monthlyData).sort().slice(-6);
+            const diesel = labels.map(l => monthlyData[l]?.diesel || 0);
+            const benzin95 = labels.map(l => monthlyData[l]?.benzin95 || 0);
+            const benzin91 = labels.map(l => monthlyData[l]?.benzin91 || 0);
+
+            userChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.map(l => {
+                        const [y, m] = l.split('-');
+                        return new Date(y, m - 1).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' });
+                    }),
+                    datasets: [{
+                        label: 'ดีเซล',
+                        data: diesel,
+                        borderColor: '#fbbf24',
+                        backgroundColor: 'rgba(251, 191, 36, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'เบนซิน 95',
+                        data: benzin95,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'เบนซิน 91',
+                        data: benzin91,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function renderTable(requests) {
+            if (requests.length === 0) {
+                document.getElementById('requestsTable').innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>ไม่มีข้อมูล</h3></div>';
+                return;
+            }
+
+            document.getElementById('requestsTable').innerHTML = `
+                <table class="table">
+                    <thead><tr><th>รหัส</th><th>วันที่</th><th>ประเภท</th><th>จำนวน</th><th>ทะเบียน</th><th>สถานะ</th></tr></thead>
+                    <tbody>
+                        ${requests.map(r => `
+                            <tr>
+                                <td><strong>${r.id}</strong></td>
+                                <td>${Utils.formatDate(r.requestDate)}</td>
+                                <td><span class="badge badge-${r.fuelType}">${Utils.getFuelTypeName(r.fuelType)}</span></td>
+                                <td>${Utils.formatNumber(r.actualLiters || r.liters)} ลิตร</td>
+                                <td>${r.vehiclePlate}</td>
+                                <td><span class="badge badge-${r.status}">${Utils.getStatusName(r.status)}</span></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function exportUserHistory() {
+            const userId = document.getElementById('userSelect').value;
+            if (!userId) return;
+
+            const user = DataManager.getUserById(userId);
+            const requests = DataManager.getRequestsByUser(userId);
+
+            const data = requests.map(r => ({
+                'รหัส': r.id,
+                'วันที่': Utils.formatDate(r.requestDate),
+                'ประเภทน้ำมัน': Utils.getFuelTypeName(r.fuelType),
+                'จำนวน (ลิตร)': r.actualLiters || r.liters,
+                'ทะเบียนรถ': r.vehiclePlate,
+                'สถานะ': Utils.getStatusName(r.status)
+            }));
+
+            Utils.exportCSV(data, `ประวัติ_${user.name}_${Utils.formatDateForInput(new Date())}.csv`);
+        }
+    </script>
+</body>
+
+</html>

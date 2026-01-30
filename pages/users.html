@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการผู้ใช้ - ระบบจัดการน้ำมัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body data-theme="light">
+    <button class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">⛽</div>
+                <div>
+                    <div class="sidebar-title">ระบบจัดการน้ำมัน</div>
+                    <div class="sidebar-subtitle">Fuel Management</div>
+                </div>
+            </div>
+            <ul class="nav-menu"></ul>
+            <div class="sidebar-user">
+                <div class="user-info"></div>
+                <a href="#" class="nav-link" id="logoutBtn"><i
+                        class="fas fa-sign-out-alt"></i><span>ออกจากระบบ</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-users"></i> จัดการผู้ใช้</h1>
+                    <p class="page-subtitle">เพิ่ม แก้ไข ลบ ผู้ใช้งานระบบ</p>
+                </div>
+                <button class="btn btn-primary" onclick="openUserModal()"><i class="fas fa-plus"></i>
+                    เพิ่มผู้ใช้</button>
+            </div>
+
+            <div class="card">
+                <div class="card-body" style="padding:0">
+                    <div class="table-container" id="usersTable"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- User Modal -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">เพิ่มผู้ใช้</h3>
+                <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    <div class="form-group">
+                        <label class="form-label">ชื่อผู้ใช้ <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">รหัสผ่าน <span class="required">*</span></label>
+                        <input type="password" class="form-control" id="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ชื่อ-สกุล <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">บทบาท <span class="required">*</span></label>
+                        <select class="form-control form-select" id="role" required>
+                            <option value="requester">ผู้เบิก</option>
+                            <option value="officer">เจ้าหน้าที่น้ำมัน</option>
+                            <option value="admin">ผู้ดูแลระบบ</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+                <button class="btn btn-primary" onclick="saveUser()"><i class="fas fa-save"></i> บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../utils.js"></script>
+    <script src="../data.js"></script>
+    <script src="../auth.js"></script>
+    <script src="../app.js"></script>
+    <script>
+        let editingUserId = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!Auth.isAdmin()) {
+                Utils.showToast('เฉพาะ Admin เท่านั้น', 'danger');
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            loadUsers();
+        });
+
+        function loadUsers() {
+            const users = DataManager.getUsers();
+            document.getElementById('usersTable').innerHTML = `
+                <table class="table">
+                    <thead><tr><th>ID</th><th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th><th>บทบาท</th><th>สถานะ</th><th>ดำเนินการ</th></tr></thead>
+                    <tbody>
+                        ${users.map(u => `
+                            <tr>
+                                <td>${u.id}</td>
+                                <td><strong>${u.username}</strong></td>
+                                <td>${u.name}</td>
+                                <td><span class="badge badge-${u.role}">${Utils.getRoleName(u.role)}</span></td>
+                                <td>${u.active ? '<span class="text-success">ใช้งาน</span>' : '<span class="text-danger">ปิดใช้งาน</span>'}</td>
+                                <td class="table-actions">
+                                    <button class="btn btn-sm btn-secondary" onclick="editUser('${u.id}')"><i class="fas fa-edit"></i></button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${u.role === 'admin' ? 'disabled' : ''}><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function openUserModal() {
+            editingUserId = null;
+            document.getElementById('modalTitle').textContent = 'เพิ่มผู้ใช้';
+            document.getElementById('userForm').reset();
+            document.getElementById('password').required = true;
+            document.getElementById('userModal').classList.add('active');
+        }
+
+        function editUser(id) {
+            const user = DataManager.getUserById(id);
+            if (!user) return;
+            editingUserId = id;
+            document.getElementById('modalTitle').textContent = 'แก้ไขผู้ใช้';
+            document.getElementById('userId').value = user.id;
+            document.getElementById('username').value = user.username;
+            document.getElementById('password').value = '';
+            document.getElementById('password').required = false;
+            document.getElementById('name').value = user.name;
+            document.getElementById('role').value = user.role;
+            document.getElementById('userModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('userModal').classList.remove('active');
+            editingUserId = null;
+        }
+
+        function saveUser() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const name = document.getElementById('name').value.trim();
+            const role = document.getElementById('role').value;
+
+            if (!username || !name || !role) {
+                Utils.showToast('กรุณากรอกข้อมูลให้ครบ', 'warning');
+                return;
+            }
+
+            if (editingUserId) {
+                const updates = { username, name, role };
+                if (password) updates.password = password;
+                DataManager.updateUser(editingUserId, updates);
+                Utils.showToast('แก้ไขผู้ใช้สำเร็จ', 'success');
+            } else {
+                if (!password) {
+                    Utils.showToast('กรุณากรอกรหัสผ่าน', 'warning');
+                    return;
+                }
+                if (DataManager.getUserByUsername(username)) {
+                    Utils.showToast('ชื่อผู้ใช้นี้มีอยู่แล้ว', 'danger');
+                    return;
+                }
+                DataManager.addUser({ username, password, name, role });
+                Utils.showToast('เพิ่มผู้ใช้สำเร็จ', 'success');
+            }
+
+            closeModal();
+            loadUsers();
+        }
+
+        async function deleteUser(id) {
+            const user = DataManager.getUserById(id);
+            if (user.role === 'admin') {
+                Utils.showToast('ไม่สามารถลบ Admin ได้', 'danger');
+                return;
+            }
+            if (!await Utils.confirm(`ต้องการลบผู้ใช้ "${user.name}" หรือไม่?`)) return;
+            DataManager.deleteUser(id);
+            Utils.showToast('ลบผู้ใช้สำเร็จ', 'success');
+            loadUsers();
+        }
+    </script>
+</body>
+
+</html>

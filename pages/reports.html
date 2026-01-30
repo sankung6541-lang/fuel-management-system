@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>รายงาน - ระบบจัดการน้ำมัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body data-theme="light">
+    <button class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">⛽</div>
+                <div>
+                    <div class="sidebar-title">ระบบจัดการน้ำมัน</div>
+                    <div class="sidebar-subtitle">Fuel Management</div>
+                </div>
+            </div>
+            <ul class="nav-menu"></ul>
+            <div class="sidebar-user">
+                <div class="user-info"></div>
+                <a href="#" class="nav-link" id="logoutBtn"><i
+                        class="fas fa-sign-out-alt"></i><span>ออกจากระบบ</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-chart-bar"></i> รายงาน</h1>
+                    <p class="page-subtitle">ประวัติการเบิกจ่ายและสรุปรายเดือน</p>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="exportCSV()"><i class="fas fa-file-csv"></i> Export
+                        CSV</button>
+                    <button class="btn btn-primary" onclick="printTable()"><i class="fas fa-print"></i> พิมพ์</button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group mb-0">
+                            <label class="form-label">ประเภทน้ำมัน</label>
+                            <select class="form-control form-select" id="filterFuelType" onchange="loadReport()">
+                                <option value="">ทั้งหมด</option>
+                                <option value="diesel">ดีเซล</option>
+                                <option value="benzin95">เบนซิน 95</option>
+                                <option value="benzin91">เบนซิน 91</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">สถานะ</label>
+                            <select class="form-control form-select" id="filterStatus" onchange="loadReport()">
+                                <option value="">ทั้งหมด</option>
+                                <option value="pending">รออนุมัติ</option>
+                                <option value="completed">จ่ายแล้ว</option>
+                                <option value="rejected">ปฏิเสธ</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">จากวันที่</label>
+                            <input type="date" class="form-control" id="filterDateFrom" onchange="loadReport()">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">ถึงวันที่</label>
+                            <input type="date" class="form-control" id="filterDateTo" onchange="loadReport()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="stat-cards" id="summaryCards"></div>
+
+            <!-- Report Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">ประวัติการเบิกจ่าย</h3>
+                </div>
+                <div class="card-body" style="padding:0">
+                    <div class="table-container" id="reportTable"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../utils.js"></script>
+    <script src="../data.js"></script>
+    <script src="../auth.js"></script>
+    <script src="../app.js"></script>
+    <script>
+        let filteredData = [];
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadReport();
+        });
+
+        function loadReport() {
+            const fuelType = document.getElementById('filterFuelType').value;
+            const status = document.getElementById('filterStatus').value;
+            const dateFrom = document.getElementById('filterDateFrom').value;
+            const dateTo = document.getElementById('filterDateTo').value;
+
+            let requests = DataManager.getRequests();
+
+            // Apply filters
+            if (fuelType) requests = requests.filter(r => r.fuelType === fuelType);
+            if (status) requests = requests.filter(r => r.status === status);
+            if (dateFrom) requests = requests.filter(r => new Date(r.requestDate) >= new Date(dateFrom));
+            if (dateTo) requests = requests.filter(r => new Date(r.requestDate) <= new Date(dateTo + 'T23:59:59'));
+
+            filteredData = requests;
+
+            // Summary
+            const completed = requests.filter(r => r.status === 'completed');
+            const totalLiters = completed.reduce((sum, r) => sum + (r.actualLiters || r.liters), 0);
+            const dieselTotal = completed.filter(r => r.fuelType === 'diesel').reduce((sum, r) => sum + (r.actualLiters || r.liters), 0);
+            const benzin95Total = completed.filter(r => r.fuelType === 'benzin95').reduce((sum, r) => sum + (r.actualLiters || r.liters), 0);
+            const benzin91Total = completed.filter(r => r.fuelType === 'benzin91').reduce((sum, r) => sum + (r.actualLiters || r.liters), 0);
+
+            document.getElementById('summaryCards').innerHTML = `
+                <div class="stat-card"><div class="stat-icon primary"><i class="fas fa-file-alt"></i></div><div class="stat-content"><div class="stat-label">จำนวนรายการ</div><div class="stat-value">${requests.length}</div></div></div>
+                <div class="stat-card"><div class="stat-icon diesel"><i class="fas fa-gas-pump"></i></div><div class="stat-content"><div class="stat-label">ดีเซล</div><div class="stat-value">${Utils.formatNumber(dieselTotal)}<span class="stat-unit">ลิตร</span></div></div></div>
+                <div class="stat-card"><div class="stat-icon benzin95"><i class="fas fa-gas-pump"></i></div><div class="stat-content"><div class="stat-label">เบนซิน 95</div><div class="stat-value">${Utils.formatNumber(benzin95Total)}<span class="stat-unit">ลิตร</span></div></div></div>
+                <div class="stat-card"><div class="stat-icon benzin91"><i class="fas fa-gas-pump"></i></div><div class="stat-content"><div class="stat-label">เบนซิน 91</div><div class="stat-value">${Utils.formatNumber(benzin91Total)}<span class="stat-unit">ลิตร</span></div></div></div>
+            `;
+
+            // Table
+            if (requests.length === 0) {
+                document.getElementById('reportTable').innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>ไม่พบข้อมูล</h3></div>';
+            } else {
+                document.getElementById('reportTable').innerHTML = `
+                    <table class="table" id="dataTable">
+                        <thead><tr><th>รหัส</th><th>วันที่</th><th>ผู้เบิก</th><th>ประเภท</th><th>ทะเบียน</th><th>จำนวน</th><th>สถานะ</th></tr></thead>
+                        <tbody>
+                            ${requests.map(r => `
+                                <tr>
+                                    <td><strong>${r.id}</strong></td>
+                                    <td>${Utils.formatDate(r.requestDate)}</td>
+                                    <td>${r.requesterName}</td>
+                                    <td><span class="badge badge-${r.fuelType}">${Utils.getFuelTypeName(r.fuelType)}</span></td>
+                                    <td>${r.vehiclePlate}</td>
+                                    <td>${Utils.formatNumber(r.actualLiters || r.liters)} ลิตร</td>
+                                    <td><span class="badge badge-${r.status}">${Utils.getStatusName(r.status)}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+
+        function exportCSV() {
+            const data = filteredData.map(r => ({
+                'รหัส': r.id,
+                'วันที่': Utils.formatDate(r.requestDate),
+                'ผู้เบิก': r.requesterName,
+                'ประเภท': Utils.getFuelTypeName(r.fuelType),
+                'ทะเบียน': r.vehiclePlate,
+                'จำนวน': r.actualLiters || r.liters,
+                'เลขไมล์': r.mileage,
+                'สถานะ': Utils.getStatusName(r.status)
+            }));
+            Utils.exportToCSV(data, 'fuel_report.csv');
+        }
+
+        function printTable() {
+            const table = document.getElementById('dataTable');
+            if (!table) { Utils.showToast('ไม่มีข้อมูล', 'warning'); return; }
+            Utils.printReport('รายงานการเบิกจ่ายน้ำมัน', table.outerHTML);
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>อนุมัติ/จ่าย - ระบบจัดการน้ำมัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body data-theme="light">
+    <button class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🛡️</div>
+                <div>
+                    <div class="sidebar-title">ระบบจัดการน้ำมัน</div>
+                    <div class="sidebar-subtitle">กองพันทหารราบ</div>
+                </div>
+            </div>
+            <ul class="nav-menu"></ul>
+            <div class="sidebar-user">
+                <div class="user-info"></div>
+                <a href="#" class="nav-link" id="logoutBtn"><i
+                        class="fas fa-sign-out-alt"></i><span>ออกจากระบบ</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-check-circle"></i> อนุมัติ/จ่ายน้ำมัน</h1>
+                    <p class="page-subtitle">จัดการคำขอเบิกน้ำมัน</p>
+                </div>
+            </div>
+
+            <!-- Pending Requests -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-clock"></i> คำขอรออนุมัติ</h3>
+                </div>
+                <div class="card-body" style="padding:0">
+                    <div class="table-container" id="pendingRequests"></div>
+                </div>
+            </div>
+
+            <!-- All Requests -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-list"></i> คำขอทั้งหมด</h3>
+                </div>
+                <div class="card-body" style="padding:0">
+                    <div class="table-container" id="allRequests"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Dispense Modal -->
+    <div class="modal-overlay" id="dispenseModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">จ่ายน้ำมัน</h3>
+                <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="requestDetails"></div>
+                <div class="form-group mt-2">
+                    <label class="form-label">จำนวนที่จ่ายจริง (ลิตร)</label>
+                    <input type="number" class="form-control" id="actualLiters" min="0">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+                <button class="btn btn-danger" onclick="rejectRequest()"><i class="fas fa-times"></i> ปฏิเสธ</button>
+                <button class="btn btn-success" onclick="approveRequest()"><i class="fas fa-check"></i>
+                    จ่ายน้ำมัน</button>
+                <button class="btn btn-primary" onclick="approveAndPrint()"><i class="fas fa-print"></i>
+                    จ่าย+พิมพ์</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../utils.js"></script>
+    <script src="../data.js"></script>
+    <script src="../auth.js"></script>
+    <script src="../google-sheets.js"></script>
+    <script src="../line-notify.js"></script>
+    <script src="../auto-sync.js"></script>
+    <script src="../app.js"></script>
+    <script>
+        let currentRequestId = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!Auth.isOfficer()) {
+                Utils.showToast('คุณไม่มีสิทธิ์เข้าถึงหน้านี้', 'danger');
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            loadRequests();
+        });
+
+        function loadRequests() {
+            const pending = DataManager.getRequestsByStatus('pending');
+            const all = DataManager.getRequests();
+
+            // Pending
+            if (pending.length === 0) {
+                document.getElementById('pendingRequests').innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i><h3>ไม่มีคำขอรออนุมัติ</h3></div>';
+            } else {
+                document.getElementById('pendingRequests').innerHTML = `
+                    <table class="table">
+                        <thead><tr><th>รหัส</th><th>ผู้เบิก</th><th>ประเภท</th><th>จำนวน</th><th>ทะเบียน</th><th>วันที่</th><th>ดำเนินการ</th></tr></thead>
+                        <tbody>
+                            ${pending.map(r => `
+                                <tr>
+                                    <td><strong>${r.id}</strong></td>
+                                    <td>${r.requesterName}</td>
+                                    <td><span class="badge badge-${r.fuelType}">${Utils.getFuelTypeName(r.fuelType)}</span></td>
+                                    <td>${Utils.formatNumber(r.liters)} ลิตร</td>
+                                    <td>${r.vehiclePlate}</td>
+                                    <td>${Utils.formatDate(r.requestDate)}</td>
+                                    <td><button class="btn btn-sm btn-success" onclick="openDispenseModal('${r.id}')"><i class="fas fa-gas-pump"></i> จ่าย</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            // All requests
+            document.getElementById('allRequests').innerHTML = `
+                <table class="table">
+                    <thead><tr><th>รหัส</th><th>ผู้เบิก</th><th>ประเภท</th><th>จำนวน</th><th>สถานะ</th><th>วันที่</th><th></th></tr></thead>
+                    <tbody>
+                        ${all.slice(0, 20).map(r => `
+                            <tr>
+                                <td><strong>${r.id}</strong></td>
+                                <td>${r.requesterName}</td>
+                                <td><span class="badge badge-${r.fuelType}">${Utils.getFuelTypeName(r.fuelType)}</span></td>
+                                <td>${Utils.formatNumber(r.actualLiters || r.liters)} ลิตร</td>
+                                <td><span class="badge badge-${r.status}">${Utils.getStatusName(r.status)}</span></td>
+                                <td>${Utils.formatDate(r.requestDate)}</td>
+                                <td>
+                                    ${r.status === 'completed' ? `<button class="btn btn-sm btn-secondary" onclick="printRequest('${r.id}')"><i class="fas fa-print"></i></button>` : ''}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function openDispenseModal(requestId) {
+            const request = DataManager.getRequestById(requestId);
+            if (!request) return;
+
+            currentRequestId = requestId;
+            document.getElementById('requestDetails').innerHTML = `
+                <p><strong>รหัสคำขอ:</strong> ${request.id}</p>
+                <p><strong>ผู้เบิก:</strong> ${request.requesterName}</p>
+                <p><strong>ประเภท:</strong> ${Utils.getFuelTypeName(request.fuelType)}</p>
+                <p><strong>ขอเบิก:</strong> ${Utils.formatNumber(request.liters)} ลิตร</p>
+                <p><strong>ทะเบียน:</strong> ${request.vehiclePlate}</p>
+                <p><strong>เลขไมล์:</strong> ${Utils.formatNumber(request.mileage)}</p>
+                ${request.purpose ? `<p><strong>วัตถุประสงค์:</strong> ${request.purpose}</p>` : ''}
+            `;
+            document.getElementById('actualLiters').value = request.liters;
+            document.getElementById('dispenseModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('dispenseModal').classList.remove('active');
+            currentRequestId = null;
+        }
+
+        async function approveRequest(andPrint = false) {
+            if (!currentRequestId) return;
+            const actualLiters = parseFloat(document.getElementById('actualLiters').value);
+            if (!actualLiters || actualLiters <= 0) {
+                Utils.showToast('กรุณาระบุจำนวนลิตร', 'warning');
+                return;
+            }
+
+            const user = Auth.getCurrentUser();
+            const request = DataManager.getRequestById(currentRequestId);
+            const result = DataManager.processFuelRequest(currentRequestId, user.id, actualLiters);
+
+            if (result.success) {
+                Utils.showToast(result.message, 'success');
+
+                // Send LINE notification
+                if (LineNotify.isConfigured()) {
+                    LineNotify.notifyApproved(request, actualLiters);
+                }
+
+                // Sync to Google Sheets
+                if (GoogleSheets.isConfigured()) {
+                    GoogleSheets.syncToSheets();
+                }
+
+                if (andPrint) {
+                    printRequest(currentRequestId);
+                }
+
+                closeModal();
+                loadRequests();
+            } else {
+                Utils.showToast(result.message, 'danger');
+            }
+        }
+
+        function approveAndPrint() {
+            approveRequest(true);
+        }
+
+        async function rejectRequest() {
+            if (!currentRequestId) return;
+            if (!await Utils.confirm('ต้องการปฏิเสธคำขอนี้?')) return;
+
+            const user = Auth.getCurrentUser();
+            DataManager.updateRequest(currentRequestId, {
+                status: 'rejected',
+                approvedBy: user.id,
+                approvedDate: Utils.getCurrentDateTime()
+            });
+
+            // Sync to Google Sheets
+            if (GoogleSheets.isConfigured()) {
+                GoogleSheets.syncToSheets();
+            }
+
+            Utils.showToast('ปฏิเสธคำขอแล้ว', 'success');
+            closeModal();
+            loadRequests();
+        }
+
+        function printRequest(requestId) {
+            const request = DataManager.getRequestById(requestId);
+            if (!request) return;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>ใบเบิกน้ำมัน - ${request.id}</title>
+                    <style>
+                        body { font-family: 'Sarabun', sans-serif; padding: 40px; }
+                        .header { text-align: center; border-bottom: 2px solid #1a472a; padding-bottom: 20px; margin-bottom: 30px; }
+                        .header h1 { color: #1a472a; margin: 0; }
+                        .header p { color: #666; margin: 5px 0; }
+                        .logo { font-size: 48px; margin-bottom: 10px; }
+                        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+                        th { background: #1a472a; color: white; width: 30%; }
+                        .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+                        .signature { text-align: center; width: 200px; }
+                        .signature-line { border-top: 1px solid #333; margin-top: 60px; padding-top: 10px; }
+                        @media print { body { padding: 20px; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="logo">🛡️</div>
+                        <h1>ใบเบิกน้ำมันเชื้อเพลิง</h1>
+                        <p>กองพันทหารราบ</p>
+                    </div>
+                    <table>
+                        <tr><th>เลขที่ใบเบิก</th><td>${request.id}</td></tr>
+                        <tr><th>วันที่ขอเบิก</th><td>${Utils.formatDate(request.requestDate, true)}</td></tr>
+                        <tr><th>ผู้เบิก</th><td>${request.requesterName}</td></tr>
+                        <tr><th>ประเภทน้ำมัน</th><td>${Utils.getFuelTypeName(request.fuelType)}</td></tr>
+                        <tr><th>จำนวนขอเบิก</th><td>${Utils.formatNumber(request.liters)} ลิตร</td></tr>
+                        <tr><th>จำนวนจ่ายจริง</th><td>${request.actualLiters ? Utils.formatNumber(request.actualLiters) + ' ลิตร' : '-'}</td></tr>
+                        <tr><th>ทะเบียนรถ</th><td>${request.vehiclePlate}</td></tr>
+                        <tr><th>เลขไมล์</th><td>${Utils.formatNumber(request.mileage)}</td></tr>
+                        <tr><th>วัตถุประสงค์</th><td>${request.purpose || '-'}</td></tr>
+                        <tr><th>สถานะ</th><td>${Utils.getStatusName(request.status)}</td></tr>
+                        <tr><th>วันที่อนุมัติ</th><td>${request.approvedDate ? Utils.formatDate(request.approvedDate, true) : '-'}</td></tr>
+                    </table>
+                    <div class="footer">
+                        <div class="signature"><div class="signature-line">ผู้เบิก</div></div>
+                        <div class="signature"><div class="signature-line">เจ้าหน้าที่น้ำมัน</div></div>
+                        <div class="signature"><div class="signature-line">ผู้อนุมัติ</div></div>
+                    </div>
+                    <script>window.onload = function() { window.print(); }<\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+    </script>
+</body>
+
+</html>

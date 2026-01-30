@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เบิกน้ำมัน - ระบบจัดการน้ำมัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body data-theme="light">
+    <button class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🛡️</div>
+                <div>
+                    <div class="sidebar-title">ระบบจัดการน้ำมัน</div>
+                    <div class="sidebar-subtitle">กองพันทหารราบ</div>
+                </div>
+            </div>
+            <ul class="nav-menu"></ul>
+            <div class="sidebar-user">
+                <div class="user-info"></div>
+                <a href="#" class="nav-link" id="logoutBtn"><i
+                        class="fas fa-sign-out-alt"></i><span>ออกจากระบบ</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-gas-pump"></i> เบิกน้ำมัน</h1>
+                    <p class="page-subtitle">กรอกข้อมูลเพื่อขอเบิกน้ำมัน</p>
+                </div>
+            </div>
+
+            <div class="stat-cards">
+                <!-- Request Form -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-file-alt"></i> แบบฟอร์มเบิกน้ำมัน</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="requestForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">ประเภทน้ำมัน <span class="required">*</span></label>
+                                    <select class="form-control form-select" id="fuelType" required>
+                                        <option value="">-- เลือก --</option>
+                                        <option value="diesel">ดีเซล</option>
+                                        <option value="benzin95">เบนซิน 95</option>
+                                        <option value="benzin91">เบนซิน 91</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">จำนวน (ลิตร) <span class="required">*</span></label>
+                                    <input type="number" class="form-control" id="liters" min="1" max="500" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">ทะเบียนรถ <span class="required">*</span></label>
+                                <select class="form-control form-select" id="vehiclePlate" required>
+                                    <option value="">-- เลือกรถ --</option>
+                                </select>
+                                <small class="text-muted">หรือพิมพ์ทะเบียนใหม่:</small>
+                                <input type="text" class="form-control mt-1" id="customPlate"
+                                    placeholder="พิมพ์ทะเบียนถ้าไม่มีในรายการ">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">เลขไมล์ <span class="required">*</span></label>
+                                    <input type="number" class="form-control" id="mileage" min="0" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">วัตถุประสงค์</label>
+                                    <input type="text" class="form-control" id="purpose" placeholder="เช่น ราชการ, ฝึก">
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-paper-plane"></i>
+                                    ส่งคำขอ</button>
+                                <button type="reset" class="btn btn-secondary"><i class="fas fa-redo"></i>
+                                    ล้างฟอร์ม</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- My Requests -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-history"></i> คำขอของฉัน</h3>
+                    </div>
+                    <div class="card-body" style="padding:0" id="myRequests"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../utils.js"></script>
+    <script src="../data.js"></script>
+    <script src="../auth.js"></script>
+    <script src="../google-sheets.js"></script>
+    <script src="../line-notify.js"></script>
+    <script src="../vehicles.js"></script>
+    <script src="../app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            loadVehicles();
+            loadMyRequests();
+        });
+
+        // Load vehicles dropdown
+        function loadVehicles() {
+            const select = document.getElementById('vehiclePlate');
+            const fuelType = document.getElementById('fuelType').value;
+
+            const vehicles = fuelType ? VehicleRegistry.getByFuelType(fuelType) : VehicleRegistry.getActive();
+
+            select.innerHTML = '<option value="">-- เลือกรถ --</option>';
+            vehicles.forEach(v => {
+                select.innerHTML += `<option value="${v.plate}">${v.plate} - ${v.type} (${v.department})</option>`;
+            });
+        }
+
+        // Filter vehicles when fuel type changes
+        document.getElementById('fuelType').addEventListener('change', loadVehicles);
+
+        // Load my requests
+        function loadMyRequests() {
+            const user = Auth.getCurrentUser();
+            const requests = DataManager.getRequestsByUser(user.id).slice(0, 10);
+
+            if (requests.length === 0) {
+                document.getElementById('myRequests').innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><h3>ไม่มีคำขอ</h3></div>';
+                return;
+            }
+
+            document.getElementById('myRequests').innerHTML = `
+                <table class="table">
+                    <thead><tr><th>รหัส</th><th>ประเภท</th><th>จำนวน</th><th>ทะเบียน</th><th>สถานะ</th><th>วันที่</th><th></th></tr></thead>
+                    <tbody>
+                        ${requests.map(r => `
+                            <tr>
+                                <td><strong>${r.id}</strong></td>
+                                <td><span class="badge badge-${r.fuelType}">${Utils.getFuelTypeName(r.fuelType)}</span></td>
+                                <td>${Utils.formatNumber(r.liters)} ลิตร</td>
+                                <td>${r.vehiclePlate}</td>
+                                <td><span class="badge badge-${r.status}">${Utils.getStatusName(r.status)}</span></td>
+                                <td>${Utils.formatDate(r.requestDate)}</td>
+                                <td>
+                                    ${r.status === 'completed' ? `<button class="btn btn-sm btn-secondary" onclick="printRequest('${r.id}')"><i class="fas fa-print"></i></button>` : ''}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // Submit request
+        document.getElementById('requestForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const user = Auth.getCurrentUser();
+
+            const plate = document.getElementById('customPlate').value.trim() || document.getElementById('vehiclePlate').value;
+
+            if (!plate) {
+                Utils.showToast('กรุณาเลือกหรือกรอกทะเบียนรถ', 'warning');
+                return;
+            }
+
+            const request = {
+                requesterId: user.id,
+                requesterName: user.name,
+                fuelType: document.getElementById('fuelType').value,
+                liters: parseFloat(document.getElementById('liters').value),
+                vehiclePlate: plate,
+                mileage: parseInt(document.getElementById('mileage').value),
+                purpose: document.getElementById('purpose').value
+            };
+
+            DataManager.addRequest(request);
+            Utils.showToast('ส่งคำขอเบิกน้ำมันสำเร็จ', 'success');
+
+            // Send LINE notification
+            if (LineNotify.isConfigured()) {
+                const newRequest = DataManager.getRequests()[0];
+                LineNotify.notifyNewRequest(newRequest);
+            }
+
+            // Sync to Google Sheets
+            if (GoogleSheets.isConfigured()) {
+                GoogleSheets.syncToSheets();
+            }
+
+            this.reset();
+            loadMyRequests();
+        });
+
+        // Print request
+        function printRequest(requestId) {
+            const request = DataManager.getRequestById(requestId);
+            if (!request) return;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>ใบเบิกน้ำมัน - ${request.id}</title>
+                    <style>
+                        body { font-family: 'Sarabun', sans-serif; padding: 40px; }
+                        .header { text-align: center; border-bottom: 2px solid #1a472a; padding-bottom: 20px; margin-bottom: 30px; }
+                        .header h1 { color: #1a472a; margin: 0; }
+                        .header p { color: #666; margin: 5px 0; }
+                        .logo { font-size: 48px; margin-bottom: 10px; }
+                        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+                        th { background: #1a472a; color: white; width: 30%; }
+                        .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+                        .signature { text-align: center; width: 200px; }
+                        .signature-line { border-top: 1px solid #333; margin-top: 60px; padding-top: 10px; }
+                        @media print { body { padding: 20px; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="logo">🛡️</div>
+                        <h1>ใบเบิกน้ำมันเชื้อเพลิง</h1>
+                        <p>กองพันทหารราบ</p>
+                    </div>
+                    <table>
+                        <tr><th>เลขที่ใบเบิก</th><td>${request.id}</td></tr>
+                        <tr><th>วันที่ขอเบิก</th><td>${Utils.formatDate(request.requestDate, true)}</td></tr>
+                        <tr><th>ผู้เบิก</th><td>${request.requesterName}</td></tr>
+                        <tr><th>ประเภทน้ำมัน</th><td>${Utils.getFuelTypeName(request.fuelType)}</td></tr>
+                        <tr><th>จำนวนขอเบิก</th><td>${Utils.formatNumber(request.liters)} ลิตร</td></tr>
+                        <tr><th>จำนวนจ่ายจริง</th><td>${request.actualLiters ? Utils.formatNumber(request.actualLiters) + ' ลิตร' : '-'}</td></tr>
+                        <tr><th>ทะเบียนรถ</th><td>${request.vehiclePlate}</td></tr>
+                        <tr><th>เลขไมล์</th><td>${Utils.formatNumber(request.mileage)}</td></tr>
+                        <tr><th>วัตถุประสงค์</th><td>${request.purpose || '-'}</td></tr>
+                        <tr><th>สถานะ</th><td>${Utils.getStatusName(request.status)}</td></tr>
+                        <tr><th>วันที่อนุมัติ</th><td>${request.approvedDate ? Utils.formatDate(request.approvedDate, true) : '-'}</td></tr>
+                    </table>
+                    <div class="footer">
+                        <div class="signature">
+                            <div class="signature-line">ผู้เบิก</div>
+                        </div>
+                        <div class="signature">
+                            <div class="signature-line">เจ้าหน้าที่น้ำมัน</div>
+                        </div>
+                        <div class="signature">
+                            <div class="signature-line">ผู้อนุมัติ</div>
+                        </div>
+                    </div>
+                    <script>window.onload = function() { window.print(); }<\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+    </script>
+</body>
+
+</html>

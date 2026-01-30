@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตั้งค่า - ระบบจัดการน้ำมัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body data-theme="light">
+    <button class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+    <div class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🛡️</div>
+                <div>
+                    <div class="sidebar-title">ระบบจัดการน้ำมัน</div>
+                    <div class="sidebar-subtitle">กองพันทหารราบ</div>
+                </div>
+            </div>
+            <ul class="nav-menu"></ul>
+            <div class="sidebar-user">
+                <div class="user-info"></div>
+                <a href="#" class="nav-link" id="logoutBtn"><i
+                        class="fas fa-sign-out-alt"></i><span>ออกจากระบบ</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title"><i class="fas fa-cogs"></i> ตั้งค่าระบบ</h1>
+                    <p class="page-subtitle">จัดการยอดน้ำมัน, Google Sheets และ LINE Notify</p>
+                </div>
+            </div>
+
+            <!-- Google Sheets Settings -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fab fa-google-drive"></i> เชื่อมต่อ Google Sheets</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-2">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <strong>วิธีเชื่อมต่อ:</strong> สร้าง Google Sheets > Extensions > Apps Script > วาง Code
+                            จาก <code>Code.gs</code> > Deploy as Web app > Copy URL มาวางด้านล่าง
+                        </div>
+                    </div>
+                    <form id="googleSheetsForm">
+                        <div class="form-group">
+                            <label class="form-label">Web App URL</label>
+                            <input type="url" class="form-control" id="webAppUrl"
+                                placeholder="https://script.google.com/macros/s/xxx/exec">
+                        </div>
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> บันทึก</button>
+                            <button type="button" class="btn btn-success" onclick="testConnection()"><i
+                                    class="fas fa-plug"></i> ทดสอบ</button>
+                            <button type="button" class="btn btn-warning" onclick="syncNow()"><i
+                                    class="fas fa-sync-alt"></i> Sync</button>
+                        </div>
+                    </form>
+                    <div id="connectionStatus" class="mt-2"></div>
+                </div>
+            </div>
+
+            <!-- Telegram Bot Settings -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fab fa-telegram"></i> Telegram Bot</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-2">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <strong>วิธีสร้าง Bot:</strong><br>
+                            1. ค้นหา <code>@BotFather</code> ใน Telegram<br>
+                            2. พิมพ์ <code>/newbot</code> แล้วตั้งชื่อ<br>
+                            3. Copy Token ที่ได้<br>
+                            4. เพิ่ม Bot เข้ากลุ่ม แล้วส่งข้อความอะไรก็ได้<br>
+                            5. ไป <code>https://api.telegram.org/bot{TOKEN}/getUpdates</code> เพื่อดู Chat ID
+                        </div>
+                    </div>
+                    <form id="telegramForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Bot Token</label>
+                                <input type="text" class="form-control" id="botToken"
+                                    placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Chat ID</label>
+                                <input type="text" class="form-control" id="chatId" placeholder="-1001234567890">
+                            </div>
+                        </div>
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> บันทึก</button>
+                            <button type="button" class="btn btn-success" onclick="testTelegram()"><i
+                                    class="fas fa-paper-plane"></i> ทดสอบส่ง</button>
+                        </div>
+                    </form>
+                    <div id="telegramStatus" class="mt-2"></div>
+                </div>
+            </div>
+
+            <!-- Inventory Settings -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-oil-can"></i> ตั้งค่ายอดน้ำมัน</h3>
+                </div>
+                <div class="card-body">
+                    <form id="inventoryForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">ดีเซล (ลิตร)</label>
+                                <input type="number" class="form-control" id="dieselAmount" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">เบนซิน 95 (ลิตร)</label>
+                                <input type="number" class="form-control" id="benzin95Amount" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">เบนซิน 91 (ลิตร)</label>
+                                <input type="number" class="form-control" id="benzin91Amount" min="0">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i>
+                            บันทึกยอดน้ำมัน</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Add Fuel -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-truck-loading"></i> รับน้ำมันเข้าคลัง</h3>
+                </div>
+                <div class="card-body">
+                    <form id="addFuelForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">ประเภทน้ำมัน</label>
+                                <select class="form-control form-select" id="addFuelType" required>
+                                    <option value="diesel">ดีเซล</option>
+                                    <option value="benzin95">เบนซิน 95</option>
+                                    <option value="benzin91">เบนซิน 91</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">จำนวน (ลิตร)</label>
+                                <input type="number" class="form-control" id="addLiters" min="1" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">หมายเหตุ</label>
+                            <input type="text" class="form-control" id="addNote"
+                                placeholder="เช่น รับจาก ปตท., ใบส่งสินค้าเลขที่...">
+                        </div>
+                        <button type="submit" class="btn btn-success"><i class="fas fa-plus-circle"></i>
+                            รับน้ำมันเข้า</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Auto Sync Settings -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-sync-alt"></i> Auto Sync</h3>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-center justify-between">
+                        <div>
+                            <strong>Sync อัตโนมัติทุก 5 นาที</strong>
+                            <p class="text-muted">ระบบจะ Sync ข้อมูลไปยัง Google Sheets อัตโนมัติ</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="autoSyncToggle" checked onchange="toggleAutoSync()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup/Restore -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-database"></i> สำรอง/กู้คืนข้อมูล</h3>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="backupData()"><i class="fas fa-download"></i>
+                            สำรองข้อมูล</button>
+                        <label class="btn btn-secondary"><i class="fas fa-upload"></i> กู้คืนข้อมูล<input type="file"
+                                id="restoreFile" accept=".json" style="display:none"
+                                onchange="restoreData(this)"></label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reset -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title text-danger"><i class="fas fa-exclamation-triangle"></i> รีเซ็ตระบบ</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">การรีเซ็ตจะลบข้อมูลทั้งหมด <strong>ไม่สามารถกู้คืนได้!</strong></p>
+                    <button class="btn btn-danger" onclick="resetSystem()"><i class="fas fa-trash-alt"></i>
+                        รีเซ็ตทั้งหมด</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../utils.js"></script>
+    <script src="../data.js"></script>
+    <script src="../auth.js"></script>
+    <script src="../google-sheets.js"></script>
+    <script src="../line-notify.js"></script>
+    <script src="../auto-sync.js"></script>
+    <script src="../app.js"></script>
+    <style>
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--success);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (!Auth.isAdmin()) {
+                Utils.showToast('เฉพาะ Admin เท่านั้น', 'danger');
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            loadInventory();
+            loadGoogleSheetsConfig();
+            loadTelegramConfig();
+        });
+
+        function loadInventory() {
+            const inv = DataManager.getInventory();
+            document.getElementById('dieselAmount').value = inv.diesel.current;
+            document.getElementById('benzin95Amount').value = inv.benzin95.current;
+            document.getElementById('benzin91Amount').value = inv.benzin91.current;
+        }
+
+        function loadGoogleSheetsConfig() {
+            document.getElementById('webAppUrl').value = GoogleSheets.WEB_APP_URL || '';
+        }
+
+        function loadTelegramConfig() {
+            document.getElementById('botToken').value = TelegramNotify.BOT_TOKEN || '';
+            document.getElementById('chatId').value = TelegramNotify.CHAT_ID || '';
+        }
+
+        document.getElementById('googleSheetsForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const url = document.getElementById('webAppUrl').value.trim();
+            GoogleSheets.setWebAppUrl(url);
+            Utils.showToast('บันทึก URL สำเร็จ', 'success');
+        });
+
+        document.getElementById('telegramForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const botToken = document.getElementById('botToken').value.trim();
+            const chatId = document.getElementById('chatId').value.trim();
+            TelegramNotify.setConfig(botToken, chatId);
+            Utils.showToast('บันทึก Telegram Bot สำเร็จ', 'success');
+        });
+
+        async function testTelegram() {
+            const statusDiv = document.getElementById('telegramStatus');
+            if (!TelegramNotify.isConfigured()) {
+                statusDiv.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-circle"></i> กรุณากรอก Bot Token และ Chat ID ก่อน</div>';
+                return;
+            }
+            statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> กำลังส่ง...</div>';
+
+            const result = await TelegramNotify.send('🧪 *ทดสอบระบบแจ้งเตือน*\nระบบจัดการน้ำมัน - กองพันทหารราบ');
+
+            if (result.success) {
+                statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> ส่งข้อความทดสอบสำเร็จ! ตรวจสอบ Telegram ของคุณ</div>';
+            } else {
+                statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times-circle"></i> ${result.message}</div>`;
+            }
+        }
+
+        async function testConnection() {
+            const statusDiv = document.getElementById('connectionStatus');
+            if (!GoogleSheets.isConfigured()) {
+                statusDiv.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-circle"></i> กรุณากรอก URL ก่อน</div>';
+                return;
+            }
+            statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> กำลังทดสอบ...</div>';
+
+            try {
+                const response = await fetch(GoogleSheets.WEB_APP_URL + '?action=test');
+                statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> เชื่อมต่อสำเร็จ!</div>';
+            } catch (error) {
+                statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-times-circle"></i> ไม่สามารถเชื่อมต่อได้ (อาจเป็น CORS แต่ยัง Sync ได้)</div>';
+            }
+        }
+
+        async function syncNow() {
+            const statusDiv = document.getElementById('connectionStatus');
+            if (!GoogleSheets.isConfigured()) {
+                statusDiv.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-circle"></i> กรุณากรอก URL ก่อน</div>';
+                return;
+            }
+            statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> กำลัง Sync...</div>';
+
+            const result = await GoogleSheets.syncToSheets();
+
+            if (result.success) {
+                statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Sync สำเร็จ!</div>';
+            } else {
+                statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times-circle"></i> ${result.message}</div>`;
+            }
+        }
+
+        function toggleAutoSync() {
+            const enabled = document.getElementById('autoSyncToggle').checked;
+            if (enabled) {
+                AutoSync.start();
+                Utils.showToast('เปิด Auto Sync', 'success');
+            } else {
+                AutoSync.stop();
+                Utils.showToast('ปิด Auto Sync', 'info');
+            }
+        }
+
+        document.getElementById('inventoryForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            DataManager.setInventory('diesel', parseFloat(document.getElementById('dieselAmount').value) || 0);
+            DataManager.setInventory('benzin95', parseFloat(document.getElementById('benzin95Amount').value) || 0);
+            DataManager.setInventory('benzin91', parseFloat(document.getElementById('benzin91Amount').value) || 0);
+            Utils.showToast('บันทึกยอดน้ำมันสำเร็จ', 'success');
+
+            if (GoogleSheets.isConfigured()) GoogleSheets.syncToSheets();
+        });
+
+        document.getElementById('addFuelForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const type = document.getElementById('addFuelType').value;
+            const liters = parseFloat(document.getElementById('addLiters').value);
+            const note = document.getElementById('addNote').value;
+            const user = Auth.getCurrentUser();
+
+            DataManager.addFuelToInventory(type, liters, user.id, note);
+            Utils.showToast(`เพิ่ม ${Utils.getFuelTypeName(type)} ${Utils.formatNumber(liters)} ลิตร สำเร็จ`, 'success');
+            loadInventory();
+            this.reset();
+
+            // Send Telegram notification
+            if (TelegramNotify.isConfigured()) {
+                TelegramNotify.notifyFuelReceived(type, liters, note);
+            }
+
+            if (GoogleSheets.isConfigured()) GoogleSheets.syncToSheets();
+        });
+
+        function backupData() {
+            const data = DataManager.exportAllData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `fuel_backup_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            Utils.showToast('สำรองข้อมูลสำเร็จ', 'success');
+        }
+
+        function restoreData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function (e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!await Utils.confirm('ต้องการกู้คืนข้อมูล?')) return;
+                    DataManager.importData(data);
+                    Utils.showToast('กู้คืนข้อมูลสำเร็จ', 'success');
+                    loadInventory();
+                } catch (err) {
+                    Utils.showToast('ไฟล์ไม่ถูกต้อง', 'danger');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function resetSystem() {
+            if (!await Utils.confirm('⚠️ ต้องการรีเซ็ตข้อมูลทั้งหมด?')) return;
+            DataManager.resetData();
+            Utils.showToast('รีเซ็ตระบบสำเร็จ', 'success');
+            loadInventory();
+        }
+    </script>
+</body>
+
+</html>
