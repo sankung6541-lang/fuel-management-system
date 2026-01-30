@@ -4,8 +4,8 @@
  */
 
 const GoogleSheets = {
-    // ตั้งค่า Web App URL
-    WEB_APP_URL: '',
+    // ตั้งค่า Web App URL (ฝังไว้ถาวร)
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbwLWa_mNDcwXS60Jm_ycErAt2BWFGi4V23H4CmPhkPv34MeqM_WZ8AcbIuE26Gr1j1B3g/exec',
 
     // Status
     isConfigured() {
